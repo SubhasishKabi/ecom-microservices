@@ -1,0 +1,642 @@
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:14
+    mem_limit: 700m
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-skabi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-skabi}
+      PGDATA: /data/postgres
+    volumes:
+      - postgres:/data/postgres
+      - ./init-multi-db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    container_name: pgadmin_container
+    image: dpage/pgadmin4
+    mem_limit: 700m
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-pgadmin4@pgadmin.org}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    networks:
+      - backend
+    restart: unless-stopped
+
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - backend
+    restart: unless-stopped
+
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+
+    ports:
+      - "9092:9092"
+
+    environment:
+      # Zookeeper
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Broker ID
+      KAFKA_BROKER_ID: 1
+      # Two listeners
+      # INTERNAL  -> Docker containers
+      # EXTERNAL  -> Windows/IntelliJ
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      # What clients should use to connect
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      # Map listener names to protocols
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      # Kafka broker-to-broker communication
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      # Single broker
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+      # Faster startup
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+    depends_on:
+      - zookeeper
+
+    networks:
+      - backend
+
+    restart: unless-stopped
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "kafka-topics --bootstrap-server localhost:9092 --list"
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+
+    ports:
+      - "8089:8080"
+
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+    depends_on:
+      - kafka
+
+    networks:
+      - backend
+
+    restart: unless-stopped
+
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "5672:5672"   # RabbitMQ Message Broker
+      - "15672:15672" # RabbitMQ Management UI (http://localhost:15672)
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+#  zipkin:
+#    image: openzipkin/zipkin
+#    container_name: zipkin
+#    ports:
+#      - 9411:9411
+#    networks:
+#      - backend
+#      - loki
+
+#  config-server:
+#    build: ../../configserver
+#    container_name: config-server
+#    ports:
+#      - 8888:8888
+#    networks:
+#      - backend
+#    environment:
+#      - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=/config
+#      - RABBITMQ_HOST=rabbitmq
+#      - RABBITMQ_PORT=5672
+#      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-guest}
+#      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
+#      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
+#    volumes:
+#      - ./../../configserver/src/main/resources/config:/config
+#    depends_on:
+#      - rabbitmq
+#    healthcheck:
+#      test: [ "CMD", "wget", "--spider", "http://localhost:8888/actuator/health" ]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+
+#  eureka:
+#    build: ../../eureka
+#    container_name: eureka
+#    ports:
+#      - 8761:8761
+#    networks:
+#      - backend
+#    healthcheck:
+#      test: ["CMD", "wget", "--spider", "http://localhost:8761/actuator/health"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#
+#  gateway-service:
+#    build: ../../gateway
+#    container_name: gateway
+#    ports:
+#      - 8080:8080
+#    environment:
+#      - SPRING_PROFILES_ACTIVE=docker
+#      - ZIPKIN_URL=${ZIPKIN_URL:-http://zipkin:9411}
+#      - REDIS_HOST=redis
+#      - REDIS_PORT=6379
+#      - EUREKA_SERVER_URL=http://eureka:8761/eureka/
+#      - CONFIG_SERVER_URL=http://config-server:8888
+#      - JWT_SECRET=${JWT_SECRET}
+#    depends_on:
+#      - redis
+#      - rabbitmq
+#      - eureka
+#      - config-server
+#    networks:
+#      - backend
+#    restart: on-failure
+#
+#  user-service:
+#    build: ../../user
+#    container_name: user-service
+#    ports:
+#      - 8082:8082
+#    environment:
+#      - SPRING_PROFILES_ACTIVE=docker
+#      - DB_HOST=postgres
+#      - DB_PORT=5432
+#      - DB_NAME=userdb
+#      - DB_USER=${POSTGRES_USER:-postgres}
+#      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+#      - RABBITMQ_HOST=rabbitmq
+#      - RABBITMQ_PORT=5672
+#      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-guest}
+#      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
+#      - EUREKA_SERVER_URL=http://eureka:8761/eureka/
+#      - CONFIG_SERVER_URL=http://config-server:8888
+#      - JWT_SECRET=${JWT_SECRET}
+#      - JWT_EXPIRATION_MS=${JWT_EXPIRATION_MS:-86400000}
+#      - JWT_REFRESH_EXPIRATION_MS=${JWT_REFRESH_EXPIRATION_MS:-604800000}
+#    depends_on:
+#      - postgres
+#      - rabbitmq
+#      - eureka
+#      - config-server
+#    networks:
+#      - backend
+#    restart: on-failure
+#
+#  product-service:
+#    build: ../../product
+#    container_name: product-service
+#    ports:
+#      - 8081:8081
+#    environment:
+#      - SPRING_PROFILES_ACTIVE=docker
+#      - DB_HOST=postgres
+#      - DB_PORT=5432
+#      - DB_NAME=productdb
+#      - DB_USER=${POSTGRES_USER:-postgres}
+#      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+#      - RABBITMQ_HOST=rabbitmq
+#      - RABBITMQ_PORT=5672
+#      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-guest}
+#      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
+#      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+#      - EUREKA_SERVER_URL=http://eureka:8761/eureka/
+#      - CONFIG_SERVER_URL=http://config-server:8888
+#      - JWT_SECRET=${JWT_SECRET}
+#    depends_on:
+#      - postgres
+#      - rabbitmq
+#      - kafka
+#      - eureka
+#      - config-server
+#    networks:
+#      - backend
+#    restart: on-failure
+#
+#  order-service:
+#    build: ../../order
+#    container_name: order-service
+#    ports:
+#      - 8083:8083
+#    environment:
+#      - SPRING_PROFILES_ACTIVE=docker
+#      - DB_HOST=postgres
+#      - DB_PORT=5432
+#      - DB_NAME=orderdb
+#      - DB_USER=${POSTGRES_USER:-postgres}
+#      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+#      - RABBITMQ_HOST=rabbitmq
+#      - RABBITMQ_PORT=5672
+#      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-guest}
+#      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
+#      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+#      - EUREKA_SERVER_URL=http://eureka:8761/eureka/
+#      - CONFIG_SERVER_URL=http://config-server:8888
+#      - JWT_SECRET=${JWT_SECRET}
+#    depends_on:
+#      - postgres
+#      - rabbitmq
+#      - kafka
+#      - eureka
+#      - config-server
+#    networks:
+#      - backend
+#    restart: on-failure
+#
+#  inventory-service:
+#    build: ../../inventory
+#    container_name: inventory-service
+#    ports:
+#      - 8087:8087
+#    environment:
+#      - SPRING_PROFILES_ACTIVE=docker
+#      - DB_HOST=postgres
+#      - DB_PORT=5432
+#      - DB_NAME=inventorydb
+#      - DB_USER=${POSTGRES_USER:-postgres}
+#      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+#      - RABBITMQ_HOST=rabbitmq
+#      - RABBITMQ_PORT=5672
+#      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-guest}
+#      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
+#      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+#      - EUREKA_SERVER_URL=http://eureka:8761/eureka/
+#      - CONFIG_SERVER_URL=http://config-server:8888
+#      - JWT_SECRET=${JWT_SECRET}
+#    depends_on:
+#      - postgres
+#      - rabbitmq
+#      - kafka
+#      - eureka
+#      - config-server
+#    networks:
+#      - backend
+#    restart: on-failure
+#
+#  payment-service:
+#    build: ../../payment
+#    container_name: payment-service
+#    ports:
+#      - 8086:8086
+#    environment:
+#      - SPRING_PROFILES_ACTIVE=docker
+#      - DB_HOST=postgres
+#      - DB_PORT=5432
+#      - DB_NAME=paymentdb
+#      - DB_USER=${POSTGRES_USER:-postgres}
+#      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+#      - RABBITMQ_HOST=rabbitmq
+#      - RABBITMQ_PORT=5672
+#      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-guest}
+#      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
+#      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+#      - EUREKA_SERVER_URL=http://eureka:8761/eureka/
+#      - CONFIG_SERVER_URL=http://config-server:8888
+#      - JWT_SECRET=${JWT_SECRET}
+#    depends_on:
+#      - postgres
+#      - rabbitmq
+#      - kafka
+#      - eureka
+#      - config-server
+#    networks:
+#      - backend
+#    restart: on-failure
+#
+#  notification-service:
+#    build: ../../notification
+#    container_name: notification-service
+#    ports:
+#      - 8084:8084
+#    environment:
+#      - SPRING_PROFILES_ACTIVE=docker
+#      - DB_HOST=postgres
+#      - DB_PORT=5432
+#      - DB_NAME=notificationdb
+#      - DB_USER=${POSTGRES_USER:-postgres}
+#      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+#      - RABBITMQ_HOST=rabbitmq
+#      - RABBITMQ_PORT=5672
+#      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-guest}
+#      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
+#      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+#      - EUREKA_SERVER_URL=http://eureka:8761/eureka/
+#      - CONFIG_SERVER_URL=http://config-server:8888
+#      - JWT_SECRET=${JWT_SECRET}
+#    depends_on:
+#      - postgres
+#      - rabbitmq
+#      - kafka
+#      - eureka
+#      - config-server
+#    networks:
+#      - backend
+#    restart: on-failure
+#
+#  frontend:
+#    build: ../../frontend
+#    container_name: frontend
+#    ports:
+#      - 3000:3000
+#    environment:
+#      - VITE_API_BASE_URL=http://localhost:8080
+#    depends_on:
+#      - gateway-service
+#    networks:
+#      - backend
+#    restart: on-failure
+#-----------------------------------------------------------------------------------------------------------------
+#  read:
+#    image: grafana/loki:latest
+#    command: "-config.file=/etc/loki/config.yaml -target=read"
+#    ports:
+#      - 3101:3100
+#      - 7946
+#      - 9095
+#    volumes:
+#      - ./logging/loki-config.yaml:/etc/loki/config.yaml
+#    depends_on:
+#      - minio
+#    healthcheck:
+#      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1" ]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#    networks: &loki-dns
+#      loki:
+#        aliases:
+#          - loki
+#
+#  write:
+#    image: grafana/loki:latest
+#    command: "-config.file=/etc/loki/config.yaml -target=write"
+#    ports:
+#      - 3102:3100
+#      - 7946
+#      - 9095
+#    volumes:
+#      - ./logging/loki-config.yaml:/etc/loki/config.yaml
+#    healthcheck:
+#      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1" ]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#    depends_on:
+#      - minio
+#    networks:
+#      <<: *loki-dns
+#
+#  alloy:
+#    image: grafana/alloy:latest
+#    volumes:
+#      - ./logging/alloy-local-config.yaml:/etc/alloy/config.alloy:ro
+#      - /var/run/docker.sock:/var/run/docker.sock
+#      - ../../logs:/logs-parent:ro
+#    command:  run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+#    ports:
+#      - 12345:12345
+#    depends_on:
+#      - loki-gateway
+#    networks:
+#      - loki
+#
+#  minio:
+#    image: minio/minio
+#    entrypoint:
+#      - sh
+#      - -euc
+#      - |
+#        mkdir -p /data/loki-data && \
+#        mkdir -p /data/loki-ruler && \
+#        minio server /data
+#    environment:
+#      - MINIO_ROOT_USER=loki
+#      - MINIO_ROOT_PASSWORD=supersecret
+#      - MINIO_PROMETHEUS_AUTH_TYPE=public
+#      - MINIO_UPDATE=off
+#    ports:
+#      - 9000
+#    volumes:
+#      - ./.data/minio:/data
+#    healthcheck:
+#      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+#      interval: 15s
+#      timeout: 20s
+#      retries: 5
+#    networks:
+#      - loki
+#
+#  prometheus:
+#    image: prom/prometheus:v2.44.0
+#    container_name: prometheus
+#    ports:
+#      - "9090:9090"
+#    volumes:
+#      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+#    networks:
+#      - loki
+#
+#  grafana:
+#    image: grafana/grafana:latest
+#    environment:
+#      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+#      - GF_AUTH_ANONYMOUS_ENABLED=true
+#      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+#    depends_on:
+#      - loki-gateway
+#    entrypoint:
+#      - sh
+#      - -euc
+#      - |
+#        mkdir -p /etc/grafana/provisioning/datasources
+#        cat <<EOF > /etc/grafana/provisioning/datasources/ds.yaml
+#        apiVersion: 1
+#        datasources:
+#          - name: Loki
+#            type: loki
+#            access: proxy
+#            url: http://loki-gateway:3100
+#            jsonData:
+#              httpHeaderName1: "X-Scope-OrgID"
+#            secureJsonData:
+#              httpHeaderValue1: "tenant1"
+#        EOF
+#        /run.sh
+#    ports:
+#      - "3001:3000"   # moved off 3000 - that port is reserved for the React frontend dev server
+#    healthcheck:
+#      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1" ]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#    volumes:
+#      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+#    networks:
+#      - loki
+#
+#  backend:
+#    image: grafana/loki:latest
+#    volumes:
+#      - ./logging/loki-config.yaml:/etc/loki/config.yaml
+#    ports:
+#      - "3100"
+#      - "7946"
+#    command: "-config.file=/etc/loki/config.yaml -target=backend -legacy-read-mode=false"
+#    depends_on:
+#      - loki-gateway
+#    networks:
+#      - loki
+#
+#
+#  loki-gateway:
+#    image: nginx:latest
+#    depends_on:
+#      - read
+#      - write
+#    entrypoint:
+#      - sh
+#      - -euc
+#      - |
+#        cat <<EOF > /etc/nginx/nginx.conf
+#        user  nginx;
+#        worker_processes  5;  ## Default: 1
+#
+#        events {
+#          worker_connections   1000;
+#        }
+#
+#        http {
+#          resolver 127.0.0.11;
+#
+#          server {
+#            listen             3100;
+#
+#            location = / {
+#              return 200 'OK';
+#              auth_basic off;
+#            }
+#
+#            location = /api/prom/push {
+#              proxy_pass       http://write:3100\$$request_uri;
+#            }
+#
+#            location = /api/prom/tail {
+#              proxy_pass       http://read:3100\$$request_uri;
+#              proxy_set_header Upgrade \$$http_upgrade;
+#              proxy_set_header Connection "upgrade";
+#            }
+#
+#            location ~ /api/prom/.* {
+#              proxy_pass       http://read:3100\$$request_uri;
+#            }
+#
+#            location = /loki/api/v1/push {
+#              proxy_pass       http://write:3100\$$request_uri;
+#            }
+#
+#            location = /loki/api/v1/tail {
+#              proxy_pass       http://read:3100\$$request_uri;
+#              proxy_set_header Upgrade \$$http_upgrade;
+#              proxy_set_header Connection "upgrade";
+#            }
+#
+#            location ~ /loki/api/.* {
+#              proxy_pass       http://read:3100\$$request_uri;
+#            }
+#          }
+#        }
+#        EOF
+#        /docker-entrypoint.sh nginx -g "daemon off;"
+#    ports:
+#      - "3100:3100"
+#    healthcheck:
+#      test: ["CMD", "service", "nginx", "status"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#    networks:
+#      - loki
+#
+#
+#  flog:
+#    image: mingrammer/flog
+#    command: -f json -d 200ms -l
+#    networks:
+#      - loki
+
+
+networks:
+  backend:
+    driver: bridge
+#  loki:
+#    driver: bridge
+
+volumes:
+  postgres:
+  pgadmin:

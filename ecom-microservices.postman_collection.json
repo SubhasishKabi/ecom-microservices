@@ -1,0 +1,431 @@
+{
+  "info": {
+    "name": "Ecom Microservices (Local)",
+    "description": "Generated from the actual implementation. Base URL is the API Gateway (http://localhost:8080). Run 'Login as Admin' and 'Login as User' first - they save {{adminAccessToken}} / {{accessToken}} via a test script for the rest of the collection to reuse.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "adminAccessToken", "value": "" },
+    { "key": "productId", "value": "1" },
+    { "key": "orderId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/register",
+            "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"email\": \"jane@example.com\",\n  \"password\": \"Password1\",\n  \"phone\": \"555-0100\"\n}" }
+          }
+        },
+        {
+          "name": "Login as Admin",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const data = pm.response.json();",
+            "pm.collectionVariables.set('adminAccessToken', data.accessToken);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@ecom.com\",\n  \"password\": \"Admin@123\"\n}" }
+          }
+        },
+        {
+          "name": "Login as User",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const data = pm.response.json();",
+            "pm.collectionVariables.set('accessToken', data.accessToken);",
+            "pm.collectionVariables.set('refreshToken', data.refreshToken);"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"user@ecom.com\",\n  \"password\": \"User@123\"\n}" }
+          }
+        },
+        {
+          "name": "Refresh token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/refresh",
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" }
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/auth/me"
+          }
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/change-password",
+            "body": { "mode": "raw", "raw": "{\n  \"currentPassword\": \"User@123\",\n  \"newPassword\": \"NewPassword1\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List users (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }],
+            "url": "{{baseUrl}}/api/users?page=0&size=10"
+          }
+        },
+        {
+          "name": "Get user by id",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/users/2" }
+        },
+        {
+          "name": "Update my profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/users/2",
+            "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"phone\": \"555-0199\"\n}" }
+          }
+        },
+        {
+          "name": "Add address",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/users/2/addresses",
+            "body": { "mode": "raw", "raw": "{\n  \"type\": \"HOME\",\n  \"street\": \"123 Market St\",\n  \"city\": \"San Francisco\",\n  \"state\": \"CA\",\n  \"zipcode\": \"94105\",\n  \"country\": \"USA\",\n  \"isDefault\": true\n}" }
+          }
+        },
+        {
+          "name": "Deactivate user (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }],
+            "url": "{{baseUrl}}/api/users/2/status?active=false"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "List/filter products",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/products?page=0&size=12&sort=newest" }
+        },
+        { "name": "Featured products", "request": { "method": "GET", "url": "{{baseUrl}}/api/products/featured" } },
+        { "name": "Categories", "request": { "method": "GET", "url": "{{baseUrl}}/api/products/categories" } },
+        { "name": "Brands", "request": { "method": "GET", "url": "{{baseUrl}}/api/products/brands" } },
+        { "name": "Get product by id", "request": { "method": "GET", "url": "{{baseUrl}}/api/products/{{productId}}" } },
+        { "name": "Recommendations", "request": { "method": "GET", "url": "{{baseUrl}}/api/products/{{productId}}/recommendations" } },
+        {
+          "name": "Create product (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/products",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Test Product\",\n  \"description\": \"A product created via Postman\",\n  \"price\": 29.99,\n  \"discount\": 0,\n  \"brand\": \"Acme\",\n  \"category\": \"Electronics\",\n  \"stockQuantity\": 50,\n  \"imageUrl\": \"https://example.com/image.jpg\",\n  \"active\": true\n}" }
+          }
+        },
+        {
+          "name": "Update product (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/products/{{productId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Test Product (updated)\",\n  \"description\": \"Updated\",\n  \"price\": 24.99,\n  \"category\": \"Electronics\",\n  \"stockQuantity\": 40\n}" }
+          }
+        },
+        {
+          "name": "Deactivate product (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }],
+            "url": "{{baseUrl}}/api/products/{{productId}}"
+          }
+        },
+        { "name": "Reviews - list", "request": { "method": "GET", "url": "{{baseUrl}}/api/products/{{productId}}/reviews" } },
+        { "name": "Reviews - distribution", "request": { "method": "GET", "url": "{{baseUrl}}/api/products/{{productId}}/reviews/distribution" } },
+        {
+          "name": "Reviews - submit",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/products/{{productId}}/reviews",
+            "body": { "mode": "raw", "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Great product!\"\n}" }
+          }
+        },
+        {
+          "name": "Wishlist - add",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/wishlist/{{productId}}" }
+        },
+        {
+          "name": "Wishlist - list",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/wishlist" }
+        },
+        {
+          "name": "Recently viewed - record",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/recently-viewed/{{productId}}" }
+        },
+        {
+          "name": "Stock alert - subscribe",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/stock-alerts/{{productId}}" }
+        }
+      ]
+    },
+    {
+      "name": "Cart & Checkout",
+      "item": [
+        {
+          "name": "Add to cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "X-User-ID", "value": "2" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/cart",
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 2\n}" }
+          }
+        },
+        {
+          "name": "Get cart",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "X-User-ID", "value": "2" }],
+            "url": "{{baseUrl}}/api/cart"
+          }
+        },
+        {
+          "name": "Update cart item quantity",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "X-User-ID", "value": "2" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/cart/items/{{productId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": \"{{productId}}\",\n  \"quantity\": 3\n}" }
+          }
+        },
+        {
+          "name": "Remove cart item",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "X-User-ID", "value": "2" }],
+            "url": "{{baseUrl}}/api/cart/items/{{productId}}"
+          }
+        },
+        {
+          "name": "Checkout",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "try { const data = pm.response.json(); if (data.id) pm.collectionVariables.set('orderId', data.id); } catch (e) {}"
+          ] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "X-User-ID", "value": "2" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/orders/checkout",
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders & Returns",
+      "item": [
+        {
+          "name": "My orders",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "X-User-ID", "value": "2" }], "url": "{{baseUrl}}/api/orders?page=0&size=10" }
+        },
+        {
+          "name": "Get order by id",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "X-User-ID", "value": "2" }], "url": "{{baseUrl}}/api/orders/{{orderId}}" }
+        },
+        {
+          "name": "Cancel order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "X-User-ID", "value": "2" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/orders/{{orderId}}/cancel",
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Changed my mind\"\n}" }
+          }
+        },
+        {
+          "name": "Request return",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "X-User-ID", "value": "2" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/orders/{{orderId}}/return",
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Item arrived damaged\"\n}" }
+          }
+        },
+        {
+          "name": "My returns",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }, { "key": "X-User-ID", "value": "2" }], "url": "{{baseUrl}}/api/orders/returns/my" }
+        },
+        {
+          "name": "Verify purchase (internal)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/orders/verify-purchase?userId=2&productId={{productId}}" }
+        },
+        {
+          "name": "Admin - all orders",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }], "url": "{{baseUrl}}/api/orders/admin/all?page=0&size=20" }
+        },
+        {
+          "name": "Admin - update order status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/orders/admin/{{orderId}}/status",
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"SHIPPED\"\n}" }
+          }
+        },
+        {
+          "name": "Admin - all returns",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }], "url": "{{baseUrl}}/api/orders/returns/admin/all" }
+        },
+        {
+          "name": "Admin - decide return",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/orders/returns/admin/1/decision",
+            "body": { "mode": "raw", "raw": "{\n  \"approve\": true,\n  \"note\": \"Approved - refund issued\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inventory (Admin)",
+      "item": [
+        { "name": "Get stock (public)", "request": { "method": "GET", "url": "{{baseUrl}}/api/inventory/{{productId}}" } },
+        { "name": "List all inventory", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }], "url": "{{baseUrl}}/api/inventory?page=0&size=20" } },
+        { "name": "Low stock", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }], "url": "{{baseUrl}}/api/inventory/low-stock" } },
+        {
+          "name": "Seed/adjust inventory",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/inventory",
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": {{productId}},\n  \"productName\": \"Seed\",\n  \"totalStock\": 100,\n  \"lowStockThreshold\": 10\n}" }
+          }
+        },
+        {
+          "name": "Restock",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/inventory/{{productId}}/restock",
+            "body": { "mode": "raw", "raw": "{\n  \"quantity\": 20,\n  \"reference\": \"PO-1001\"\n}" }
+          }
+        },
+        { "name": "Audit logs", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }], "url": "{{baseUrl}}/api/inventory/{{productId}}/audit-logs" } }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        { "name": "Get payment by order id", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/payments/order/{{orderId}}" } },
+        { "name": "Admin - list payments", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }], "url": "{{baseUrl}}/api/payments?page=0&size=20" } },
+        {
+          "name": "Admin - refund",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/payments/order/{{orderId}}/refund",
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Customer requested refund\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        { "name": "My notifications", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/notifications?page=0&size=20" } },
+        { "name": "Unread count", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/notifications/unread-count" } },
+        { "name": "Mark all read", "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }], "url": "{{baseUrl}}/api/notifications/read-all" } },
+        {
+          "name": "Internal - create notification",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/notifications/internal",
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"2\",\n  \"type\": \"GENERIC\",\n  \"title\": \"Hello\",\n  \"message\": \"Test notification\",\n  \"referenceId\": \"1\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Infra / health",
+      "item": [
+        { "name": "Gateway actuator health", "request": { "method": "GET", "url": "{{baseUrl}}/actuator/health" } },
+        { "name": "Gateway routes", "request": { "method": "GET", "url": "{{baseUrl}}/actuator/gateway/routes" } },
+        { "name": "Eureka apps (direct, :8761)", "request": { "method": "GET", "url": "http://localhost:8761/eureka/apps", "header": [{ "key": "Accept", "value": "application/json" }] } }
+      ]
+    }
+  ]
+}

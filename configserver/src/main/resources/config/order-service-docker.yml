@@ -1,0 +1,115 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: order-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:orderdb}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database: POSTGRESQL
+    show-sql: false
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  cloud:
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+          auto-create-topics: true
+      bindings:
+        springCloudBusInput:
+          group: ${spring.application.name}-${server.port}
+          binder: rabbit
+        orderCreated-out-0:
+          destination: order-created
+          binder: kafka
+        orderCancelled-out-0:
+          destination: order-cancelled
+          binder: kafka
+        orderShipped-out-0:
+          destination: order-shipped
+          binder: kafka
+        orderDelivered-out-0:
+          destination: order-delivered
+          binder: kafka
+        inventoryReserved-in-0:
+          destination: inventory-reserved
+          group: order-inventory-reserved-group
+          binder: kafka
+        inventoryFailed-in-0:
+          destination: inventory-failed
+          group: order-inventory-failed-group
+          binder: kafka
+        paymentCompleted-in-0:
+          destination: payment-completed
+          group: order-payment-completed-group
+          binder: kafka
+        paymentFailed-in-0:
+          destination: payment-failed
+          group: order-payment-failed-group
+          binder: kafka
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    virtual-host: ${RABBITMQ_VHOST:/}
+    connection-timeout: 30000
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_SERVER_URL:http://eureka:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      productService:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+      paymentService:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        ignoreExceptions:
+          - java.lang.IllegalArgumentException
+          - java.lang.IllegalStateException
+  retry:
+    instances:
+      productRetry:
+        maxAttempts: 3
+        waitDuration: 2s
+
+order:
+  tax-rate: 0.08
+  free-shipping-threshold: 100.00
+  shipping-fee: 9.99
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,busrefresh
+  endpoint:
+    health:
+      show-details: always

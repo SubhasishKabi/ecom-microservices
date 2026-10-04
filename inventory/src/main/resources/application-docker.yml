@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: inventory-service
+  config:
+    import: optional:configserver:http://config-server:8888
+  cloud:
+    function:
+      # Functional consumers bound to orderCreated-in-0 / orderCancelled-in-0 / paymentFailed-in-0
+      # (bindings themselves come from config-server inventory-service-docker.yml).
+      definition: orderCreated;orderCancelled;paymentFailed;paymentCompleted
+    stream:
+      default-binder: rabbit
+
+jwt:
+  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}

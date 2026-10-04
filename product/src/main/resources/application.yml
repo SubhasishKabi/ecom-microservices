@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: product-service
+  config:
+    import: optional:configserver:http://localhost:8888
+  cloud:
+    function:
+      definition: productBackInStock
+    stream:
+      # Two binders are on the classpath (rabbit via spring-cloud-bus-amqp, kafka for stock alerts).
+      # Bindings without an explicit binder (e.g. springCloudBusOutput) keep using rabbit as before.
+      default-binder: rabbit
+      kafka:
+        binder:
+          brokers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      bindings:
+        productBackInStock-in-0:
+          destination: product-back-in-stock
+          group: product-service-stock-alert-group
+          binder: kafka
+
+jwt:
+  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}

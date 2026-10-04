@@ -1,0 +1,96 @@
+Observability is the ability to understand the internal state and behavior of a system by analyzing its outputs, such as logs, metrics, and traces.
+
+
+Logs: Records of events that happened inside a microservice.
+Metrics: Numerical measurements showing the health and performance of a microservice.
+Traces: Tracks a request as it travels across multiple microservices.
+
+
+Grafana is an observability platform used to query, visualize, explore, correlate, and alert on data such as metrics, logs, and traces.
+Grafana is a tool used to visualize and monitor your applications and infrastructure.
+Grafana takes monitoring data and turns it into dashboards, graphs, charts, and alerts.
+
+Prometheus = collects/stores metrics
+
+Grafana = displays/visualizes metrics
+
+Spring Boot
+     │
+     │ metrics
+     ↓
+Prometheus
+     │
+     │ queries
+     ↓
+Grafana
+     │
+     ↓
+📊 Dashboard
+
+
+Grafana is not just for metrics
+
+Grafana can visualize data from multiple sources, including:
+
+Prometheus → metrics
+Loki → logs. Loki is used to store and query logs centrally.
+Jaeger/Tempo → traces
+Elasticsearch → logs/data
+SQL databases → application data
+
+
+
+1. Prometheus
+Prometheus is a monitoring system that collects and stores metrics.
+
+Metrics
+For metrics, the common setup is:
+
+Spring Boot
+    ↓
+Prometheus
+    ↓
+Grafana
+
+
+Logs
+For logs, a common setup is:
+
+Spring Boot
+    ↓
+Loki
+    ↓
+Grafana
+
+
+A log collector such as Grafana Alloy sends these logs to Loki.
+
+Loki:
+
+Stores the logs
+Organizes them using labels such as service, environment, container, etc.
+Allows logs to be queried/searched
+Makes those logs available to Grafana
+
+Then Grafana can query Loki:
+
+{service="order-service"} |= "ERROR"
+
+and Loki returns matching logs.
+
+             Logs
+              ↓
+           Grafana Alloy(The Agent that collects logs from your applications.)
+              ↓
+             Loki(Loki is the main server/storage system for the logs.)
+        ┌──────────────┐
+        │ Store logs   │
+        │ Query logs   │
+        └──────┬───────┘
+               ↓
+            Grafana(Grafana is the UI used to query and display the logs.)
+        ┌──────────────┐
+        │ Search logs  │
+        │ Display logs │
+        │ Dashboards   │
+        └──────────────┘
